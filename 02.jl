@@ -17,7 +17,7 @@ struct Tape{A}
     tape::A
 end
 
-Tape(instructions::Array) = Tape(OffsetArray(instructions, 0:length(instructions)-1))
+Tape(instructions::Array) = Tape(OffsetArray(copy(instructions), 0:length(instructions)-1))
 
 import Base: iterate
 
