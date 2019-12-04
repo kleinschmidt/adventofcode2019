@@ -55,3 +55,12 @@ intersections = Iterators.drop(Iterators.filter(!isnothing, intersect(a, b) for 
 
 sort(collect(intersections), by=x->sum(abs.(x)))
 minimum(x->sum(abs.(x)), intersections)
+
+
+steps(vecs) = cumsum([sum(abs.(v))-1 for v in vecs])
+vec_steps = steps.(vecs)
+
+inters_enum =
+    Iterators.drop(
+        ((ai, bi) for (ai, a) in enumerate(edges[1]) for (bi, b) in enumerate(edges[2]) if !isnothing(intersect(a,b))),
+        1)
