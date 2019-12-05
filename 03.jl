@@ -60,13 +60,16 @@ minimum(x->sum(abs.(x)), intersections)
 steps(vecs) = cumsum([sum(abs.(v)) for v in vecs])
 vec_steps = steps.(vecs)
 
-inters_enum =
+@time inters_enum =
     Iterators.drop(
         Iterators.filter(
             x -> !isnothing(first(x)),
             ((intersect(a,b), (ai, bi)) for (ai, a) in enumerate(edges[1]) for (bi, b) in enumerate(edges[2]))
         ),
-        1)
+        1) |> collect
+
+# this is actually faster by like 50%
+@time [(intersect(a,b), (ai, bi)) for (ai, a) in enumerate(edges[1]) for (bi, b) in enumerate(edges[2]) if !isnothing(intersect(a,b))]
 
 # indices give the index of the *edge* which intersects.  this means that we
 # have to take off the bit of the edge between the intersection and the endpoint
