@@ -49,7 +49,7 @@ end
 @test intersect(([-1, 0], [1, 0]), ([0, -1], [0, 1]) .+ Ref([1,0])) == [1, 0]
 
 
-edges = [zip(v[1:end-1], v[2:end]) for v in vertices]
+edges = [collect(zip(v[1:end-1], v[2:end])) for v in vertices]
 
 intersections = Iterators.drop(Iterators.filter(!isnothing, intersect(a, b) for a in edges[1] for b in edges[2]), 1)
 
@@ -57,10 +57,25 @@ sort(collect(intersections), by=x->sum(abs.(x)))
 minimum(x->sum(abs.(x)), intersections)
 
 
-steps(vecs) = cumsum([sum(abs.(v))-1 for v in vecs])
+steps(vecs) = cumsum([sum(abs.(v)) for v in vecs])
 vec_steps = steps.(vecs)
 
 inters_enum =
     Iterators.drop(
-        ((ai, bi) for (ai, a) in enumerate(edges[1]) for (bi, b) in enumerate(edges[2]) if !isnothing(intersect(a,b))),
+        Iterators.filter(
+            x -> !isnothing(first(x)),
+            ((intersect(a,b), (ai, bi)) for (ai, a) in enumerate(edges[1]) for (bi, b) in enumerate(edges[2]))
+        ),
         1)
+
+# indices give the index of the *edge* which intersects.  this means that we
+# have to take off the bit of the edge between the intersection and the endpoint
+# (which is the same index as the edge)
+
+minimum(inters_enum) do (inter, (ai,bi))
+    @show inter
+    @show edges[1][ai], edges[2][bi]
+    steps = sum(getindex.(vec_steps, (ai,bi))) -
+        sum(abs.(edges[1][ai][2] - inter)) -
+        sum(abs.(edges[2][bi][2] - inter))
+end
