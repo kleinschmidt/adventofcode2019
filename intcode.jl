@@ -5,7 +5,9 @@ using OffsetArrays
 
 export
     Computer,
-    Op
+    Op,
+    compute,
+    outputs
 
 # format is
 # opcode, addr1, addr2, addr3
@@ -93,5 +95,10 @@ function iterate(c::Computer, state)
     return (op.name, retval), next_state
 end
 
+compute(instructions, input) = collect(Computer(instructions, input=input))
+outputs(instructions, input) = [n
+                                for (op, n)
+                                in Computer(instructions, input=input)
+                                if op === :output]
 
 end
