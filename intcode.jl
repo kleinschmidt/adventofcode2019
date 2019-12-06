@@ -60,6 +60,8 @@ const n_args = Dict(
 
 get(c::Computer, arg::Int, absmode::Bool) = absmode ? arg : c.tape[arg]
 
+Base.IteratorSize(::Type{<:Computer}) = Base.SizeUnknown()
+
 iterate(c::Computer) = iterate(c, 0)
 function iterate(c::Computer, state)
     op = Op(c.tape[state])
@@ -72,7 +74,7 @@ function iterate(c::Computer, state)
         retval = c.tape[args[3]] = op_name(get(c, args[1], op.modes[1]),
                                            get(c, args[2], op.modes[2]))
     elseif op_name === :input
-        retval = c.tape[args[3]] = pop!(c.input)
+        retval = c.tape[args[1]] = pop!(c.input)
     elseif op_name === :output
         retval = get(c, args[1], op.modes[1])
     elseif op_name === :terminate
