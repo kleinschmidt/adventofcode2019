@@ -15,16 +15,18 @@ export
 #
 # then advance four positions to next opcode.
 
-struct Op
+struct Op{T}
     code::Int
+    name::T
+    nargs::Int
     modes::Tuple{Bool,Bool,Bool}
 end    
 
 function Op(inst::Int)
     code = rem(inst, 100)
     inst = inst ÷ 100
-    modes = ntuple(i -> rem(inst ÷ 10^(i-1), 10), 3)
-    Op(code, modes)
+    modes = ntuple(i -> Bool(rem(inst ÷ 10^(i-1), 10)), 3)
+    Op(code, ops[code]..., modes)
 end
 
 struct Computer{T}
@@ -38,20 +40,16 @@ Computer(instructions::Array; input=Int[]) =
 Computer(instructions::String; input=Int[]) =
     Computer(parse.(Int, split(instructions, ',')), input=input)
 
-const ops = Dict(
-    1 => +,
-    2 => *,
-    3 => :input,
-    4 => :output,
-    99 => :terminate
-)
-
-const n_args = Dict(
-    1 => 3,
-    2 => 3,
-    3 => 1,
-    4 => 1,
-    99 => 0
+ops = Dict(
+    1 => (+, 3),
+    2 => (*, 3),
+    3 => (:input, 1),
+    4 => (:output, 1),
+    5 => (:jumpiftrue, 2),
+    6 => (:jumpiffalse, 2),
+    7 => (<, 3),
+    8 => (==, 3),
+    99 => (:terminate, 0)
 )
 
 # general strategy so far has been to treat the computer as an iterator that
@@ -65,25 +63,34 @@ Base.IteratorSize(::Type{<:Computer}) = Base.SizeUnknown()
 iterate(c::Computer) = iterate(c, 0)
 function iterate(c::Computer, state)
     op = Op(c.tape[state])
-    args = @view c.tape[state .+ (1:n_args[op.code])]
+    args = @view c.tape[state .+ (1:op.nargs)]
     # args = get.(Ref(c), state .+ (1:n_args[op.code]), op.modes[1:n_args[op.code]])
 
-    op_name = ops[op.code]
+    next_state = state + 1 + op.nargs
+    retval = nothing
 
-    if op_name isa Function
-        retval = c.tape[args[3]] = op_name(get(c, args[1], op.modes[1]),
+    if op.name isa Function
+        retval = c.tape[args[3]] = op.name(get(c, args[1], op.modes[1]),
                                            get(c, args[2], op.modes[2]))
-    elseif op_name === :input
+    elseif op.name === :input
         retval = c.tape[args[1]] = pop!(c.input)
-    elseif op_name === :output
+    elseif op.name === :output
         retval = get(c, args[1], op.modes[1])
-    elseif op_name === :terminate
+    elseif op.name === :jumpiftrue
+        if get(c, args[1], op.modes[1]) != 0
+            next_state = get(c, args[2], op.modes[2])
+        end
+    elseif op.name === :jumpiffalse
+        if get(c, args[1], op.modes[1]) == 0
+            next_state = get(c, args[2], op.modes[2])
+        end
+    elseif op.name === :terminate
         return nothing
     else
         error("Invalid op: $(op)")
     end
 
-    return (op_name, retval), state + 1 + n_args[op.code]
+    return (op.name, retval), next_state
 end
 
 
