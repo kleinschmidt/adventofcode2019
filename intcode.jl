@@ -7,7 +7,8 @@ export
     Computer,
     Op,
     compute,
-    outputs
+    outputs,
+    run!
 
 # format is
 # opcode, addr1, addr2, addr3
@@ -33,12 +34,21 @@ end
 
 struct Computer{T}
     tape::T
-    input::Array{Int}
+    input::Channel{Int}
+    output::Channel{Int}
+end
+
+channel(c::Channel) = c
+function channel(x)
+    c = Channel{eltype(x)}(Inf)
+    foreach(xx -> put!(c, xx), x)
+    return c
 end
 
 Computer(instructions::Array; input=Int[]) =
     Computer(OffsetArray(copy(instructions), 0:length(instructions)-1),
-             input)
+             channel(input),
+             Channel{Int}(Inf))
 Computer(instructions::String; input=Int[]) =
     Computer(parse.(Int, split(instructions, ',')), input=input)
 
@@ -75,9 +85,9 @@ function iterate(c::Computer, state)
         retval = c.tape[args[3]] = op.name(get(c, args[1], op.modes[1]),
                                            get(c, args[2], op.modes[2]))
     elseif op.name === :input
-        retval = c.tape[args[1]] = pop!(c.input)
+        retval = c.tape[args[1]] = take!(c.input)
     elseif op.name === :output
-        retval = get(c, args[1], op.modes[1])
+        retval = put!(c.output, get(c, args[1], op.modes[1]))
     elseif op.name === :jumpiftrue
         if get(c, args[1], op.modes[1]) != 0
             next_state = get(c, args[2], op.modes[2])
@@ -87,6 +97,7 @@ function iterate(c::Computer, state)
             next_state = get(c, args[2], op.modes[2])
         end
     elseif op.name === :terminate
+        close(c.output)
         return nothing
     else
         error("Invalid op: $(op)")
@@ -95,10 +106,15 @@ function iterate(c::Computer, state)
     return (op.name, retval), next_state
 end
 
+function run!(c::Computer)
+    for _ in c
+    end
+    c
+end
+
+
 compute(instructions, input) = collect(Computer(instructions, input=input))
-outputs(instructions, input) = [n
-                                for (op, n)
-                                in Computer(instructions, input=input)
-                                if op === :output]
+outputs(instructions, input) = outputs(run!(Computer(instructions, input=input)))
+outputs(c::Computer) = [n for n in c.output]
 
 end
