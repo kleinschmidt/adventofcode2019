@@ -64,3 +64,49 @@ function star1()
     input_ints = parse.(Int, split(chomp(input), ','))
     maximum(star1_channel(input_ints, phases) for phases in permutations(0:4))
 end
+
+# hook up the output of the last computer to the input of the first...
+function star2_channel(instructions, phases)
+    final_output = Channel{Int}()
+    computers = [Computer(instructions, input=[p], id=i) for (i,p) in enumerate(phases)]
+    for ci in 1:length(computers)
+        ci_prev = ci == 1 ? length(computers) : ci-1
+        println("connecting $(ci_prev)→$(ci)")
+        @async begin
+            while isopen(computers[ci_prev].output)
+                x = take!(computers[ci_prev].output)
+                if isopen(computers[ci].input)
+                    println("$(ci_prev)→$(ci): $x")
+                    put!(computers[ci].input, x)
+                else
+                    put!(final_output, x)
+                end
+            end
+        end
+    end
+    put!(computers[1].input, 0)
+    @sync for c in computers
+        @async run!(c)
+    end
+    # final output gets sent as input to computer 1...
+    return take!(final_output)
+end
+
+
+
+function star2_tests()
+    instructions = "3,26,1001,26,-4,26,3,27,1002,27,2,27,1,27,26,27,4,27,1001,28,-1,28,1005,28,6,99,0,0,5"
+    phases = [9,8,7,6,5]
+    @test star2_channel(instructions, phases) == 139629729
+
+    @test star2_channel("3,52,1001,52,-5,52,3,53,1,52,56,54,1007,54,5,55,1005,55,26,1001,54," *
+                        "-5,54,1105,1,12,1,53,54,53,1008,54,0,55,1001,55,1,55,2,53,55,53,4," *
+                        "53,1001,56,-1,56,1005,56,6,99,0,0,0,0,10",
+                        [9,7,8,5,6]) == 18216
+end
+
+function star2()
+    input = read("07.input", String)
+    input_ints = parse.(Int, split(chomp(input), ','))
+    maximum(star2_channel(input_ints, phases) for phases in permutations(5:9))
+end
