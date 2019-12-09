@@ -10,6 +10,15 @@ export
     outputs,
     run!
 
+# helpers
+channel(c::Channel) = c
+function channel(x)
+    c = Channel{eltype(x)}(Inf)
+    foreach(xx -> put!(c, xx), x)
+    return c
+end
+
+
 # format is
 # opcode, addr1, addr2, addr3
 #
@@ -18,41 +27,12 @@ export
 #
 # then advance four positions to next opcode.
 
-struct Op{T}
+struct Op{T,N}
     code::Int
     name::T
     nargs::Int
-    modes::Tuple{Bool,Bool,Bool}
-end    
-
-function Op(inst::Int)
-    code = rem(inst, 100)
-    inst = inst ÷ 100
-    modes = ntuple(i -> Bool(rem(inst ÷ 10^(i-1), 10)), 3)
-    Op(code, ops[code]..., modes)
+    modes::NTuple{N,Int}
 end
-
-struct Computer{T}
-    tape::T
-    input::Channel{Int}
-    output::Channel{Int}
-    id::Union{Int,Nothing}
-end
-
-channel(c::Channel) = c
-function channel(x)
-    c = Channel{eltype(x)}(Inf)
-    foreach(xx -> put!(c, xx), x)
-    return c
-end
-
-Computer(instructions::Array; input=Int[], id=nothing) =
-    Computer(OffsetArray(copy(instructions), 0:length(instructions)-1),
-             channel(input),
-             Channel{Int}(Inf),
-             id)
-Computer(instructions::String; input=Int[], id=nothing) =
-    Computer(parse.(Int, split(instructions, ',')), input=input, id=id)
 
 ops = Dict(
     1 => (+, 3),
@@ -63,14 +43,47 @@ ops = Dict(
     6 => (:jumpiffalse, 2),
     7 => (<, 3),
     8 => (==, 3),
+    9 => (:adjustrelativebase, 1),
     99 => (:terminate, 0)
 )
+
+function Op(inst::Int)
+    code = rem(inst, 100)
+    inst = inst ÷ 100
+    name, nargs = ops[code]
+    modes = ntuple(i -> rem(inst ÷ 10^(i-1), 10), nargs)
+    Op(code, name, nargs, modes)
+end
+
+struct Arg
+    addr::Int
+    mode::Int
+end
+
+struct Computer{T}
+    tape::T
+    input::Channel{Int}
+    output::Channel{Int}
+    id::Union{Int,Nothing}
+    relative_base::Int
+
+    Computer(tape::T, input, output, id) where {T} = new{T}(tape, input, output, id, 0)
+end
+
+Computer(instructions::Array; input=Int[], output=Channel{Int}(Inf), id=nothing) =
+    Computer(OffsetArray(copy(instructions), 0:length(instructions)-1),
+             channel(input),
+             output,
+             id)
+Computer(instructions::String; input=Int[], output=Channel{Int}(Inf), id=nothing) =
+    Computer(parse.(Int, split(instructions, ',')),
+             input=input, output=output, id=id)
 
 # general strategy so far has been to treat the computer as an iterator that
 # returns...what?  the tape itself?  and the pointer for the next instruction.
 # can use the iterated values as the output I guess.
 
-get(c::Computer, arg::Int, absmode::Bool) = absmode ? arg : c.tape[arg]
+get(c::Computer, arg::Int, absmode::Int) = absmode==1 ? arg : c.tape[arg]
 
 Base.IteratorSize(::Type{<:Computer}) = Base.SizeUnknown()
 
