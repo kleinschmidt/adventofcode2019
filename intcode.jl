@@ -18,15 +18,6 @@ function channel(x)
     return c
 end
 
-
-# format is
-# opcode, addr1, addr2, addr3
-#
-# opcode 1 is addition, 2 is multiplcation, 99 is terminate
-# reads from addr1, addr2 and writes to addr3 (zero-indexed)
-#
-# then advance four positions to next opcode.
-
 struct Op{T,N}
     code::Int
     name::T
@@ -103,24 +94,17 @@ Base.setindex!(c::Computer, x, arg::Arg) =
     arg.mode == 2 ? (c[arg.addr + c.relative_base[]] = x) : # relative mode
     error("unsupported mode: $(arg.mode)")
 
-# general strategy so far has been to treat the computer as an iterator that
-# returns...what?  the tape itself?  and the pointer for the next instruction.
-# can use the iterated values as the output I guess.
-
+# Computer iterates tuples of ((opname, retval), pointer)
 Base.IteratorSize(::Type{<:Computer}) = Base.SizeUnknown()
-
 iterate(c::Computer) = iterate(c, 0)
 function iterate(c::Computer, state)
     # print("[$(c.id)]: @$state $(c.tape[state])")
-
     op = Op(c.tape[state])
     args = Arg.(c.tape[state .+ (1:op.nargs)], op.modes)
-
     # println(" $(op.name) $(op.modes) $args")
     
     next_state = state + 1 + op.nargs
     retval = nothing
-
 
     if op.name isa Function
         retval = c[args[3]] = op.name(c[args[1]], c[args[2]])
@@ -155,7 +139,6 @@ function run!(c::Computer)
     end
     c
 end
-
 
 compute(instructions, input=Int[]) = collect(Computer(instructions, input=input))
 outputs(instructions, input=Int[]) = outputs(run!(Computer(instructions, input=input)))
