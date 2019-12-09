@@ -55,11 +55,6 @@ function Op(inst::Int)
     Op(code, name, nargs, modes)
 end
 
-struct Arg
-    addr::Int
-    mode::Int
-end
-
 struct Computer{T}
     tape::T
     input::Channel{Int}
@@ -79,39 +74,54 @@ Computer(instructions::String; input=Int[], output=Channel{Int}(Inf), id=nothing
     Computer(parse.(Int, split(instructions, ',')),
              input=input, output=output, id=id)
 
+struct Arg
+    addr::Int
+    mode::Int
+end
+
+Base.show(io::IO, arg::Arg) = print(io, arg.mode == 0 ? "@" : "", arg.addr)
+
+Base.getindex(c::Computer, arg::Arg) =
+    arg.mode == 0 ? c.tape[arg.addr] :               # position mode
+    arg.mode == 1 ? arg.addr :                       # absolute mode
+    error("unsupported mode: $(arg.mode)")
+
+Base.setindex!(c::Computer, x, arg::Arg) =
+    arg.mode == 0 ? (c.tape[arg.addr] = x) :
+    error("unsupported mode: $(arg.mode)")
+
 # general strategy so far has been to treat the computer as an iterator that
 # returns...what?  the tape itself?  and the pointer for the next instruction.
 # can use the iterated values as the output I guess.
-
-get(c::Computer, arg::Int, absmode::Int) = absmode==1 ? arg : c.tape[arg]
 
 Base.IteratorSize(::Type{<:Computer}) = Base.SizeUnknown()
 
 iterate(c::Computer) = iterate(c, 0)
 function iterate(c::Computer, state)
-    op = Op(c.tape[state])
-    args = @view c.tape[state .+ (1:op.nargs)]
-    # args = get.(Ref(c), state .+ (1:n_args[op.code]), op.modes[1:n_args[op.code]])
+    print("[$(c.id)]: @$state $(c.tape[state])")
 
+    op = Op(c.tape[state])
+    args = Arg.(c.tape[state .+ (1:op.nargs)], op.modes)
+
+    println(" $(op.name) $(op.modes) $args")
+    
     next_state = state + 1 + op.nargs
     retval = nothing
 
-    println("[$(c.id)]: @$state $(c.tape[state]) $(op.name) $(op.modes) ($(args...))")
 
     if op.name isa Function
-        retval = c.tape[args[3]] = op.name(get(c, args[1], op.modes[1]),
-                                           get(c, args[2], op.modes[2]))
+        retval = c[args[3]] = op.name(c[args[1]], c[args[2]])
     elseif op.name === :input
-        retval = c.tape[args[1]] = take!(c.input)
+        retval = c[args[1]] = take!(c.input)
     elseif op.name === :output
-        retval = put!(c.output, get(c, args[1], op.modes[1]))
+        retval = put!(c.output, c[args[1]])
     elseif op.name === :jumpiftrue
-        if get(c, args[1], op.modes[1]) != 0
-            next_state = get(c, args[2], op.modes[2])
+        if c[args[1]] != 0
+            next_state = c[args[2]]
         end
     elseif op.name === :jumpiffalse
-        if get(c, args[1], op.modes[1]) == 0
-            next_state = get(c, args[2], op.modes[2])
+        if c[args[1]] == 0
+            next_state = c[args[2]]
         end
     elseif op.name === :terminate
         close(c.output)
