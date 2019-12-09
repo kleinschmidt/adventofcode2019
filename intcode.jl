@@ -111,12 +111,12 @@ Base.IteratorSize(::Type{<:Computer}) = Base.SizeUnknown()
 
 iterate(c::Computer) = iterate(c, 0)
 function iterate(c::Computer, state)
-    print("[$(c.id)]: @$state $(c.tape[state])")
+    # print("[$(c.id)]: @$state $(c.tape[state])")
 
     op = Op(c.tape[state])
     args = Arg.(c.tape[state .+ (1:op.nargs)], op.modes)
 
-    println(" $(op.name) $(op.modes) $args")
+    # println(" $(op.name) $(op.modes) $args")
     
     next_state = state + 1 + op.nargs
     retval = nothing
@@ -146,7 +146,7 @@ function iterate(c::Computer, state)
         error("Invalid op: $(op)")
     end
     
-    println("[$(c.id)]: $(op.name), $retval, $next_state")
+    # println("[$(c.id)]: $(op.name), $retval, $next_state")
     return (op.name, retval), next_state
 end
 
@@ -157,8 +157,8 @@ function run!(c::Computer)
 end
 
 
-compute(instructions, input) = collect(Computer(instructions, input=input))
-outputs(instructions, input) = outputs(run!(Computer(instructions, input=input)))
+compute(instructions, input=Int[]) = collect(Computer(instructions, input=input))
+outputs(instructions, input=Int[]) = outputs(run!(Computer(instructions, input=input)))
 outputs(c::Computer) = [n for n in c.output]
 
 end
