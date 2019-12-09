@@ -36,6 +36,7 @@ struct Computer{T}
     tape::T
     input::Channel{Int}
     output::Channel{Int}
+    id::Union{Int,Nothing}
 end
 
 channel(c::Channel) = c
@@ -45,12 +46,13 @@ function channel(x)
     return c
 end
 
-Computer(instructions::Array; input=Int[]) =
+Computer(instructions::Array; input=Int[], id=nothing) =
     Computer(OffsetArray(copy(instructions), 0:length(instructions)-1),
              channel(input),
-             Channel{Int}(Inf))
-Computer(instructions::String; input=Int[]) =
-    Computer(parse.(Int, split(instructions, ',')), input=input)
+             Channel{Int}(Inf),
+             id)
+Computer(instructions::String; input=Int[], id=nothing) =
+    Computer(parse.(Int, split(instructions, ',')), input=input, id=id)
 
 ops = Dict(
     1 => (+, 3),
@@ -81,6 +83,8 @@ function iterate(c::Computer, state)
     next_state = state + 1 + op.nargs
     retval = nothing
 
+    println("[$(c.id)]: @$state $(c.tape[state]) $(op.name) $(op.modes) ($(args...))")
+
     if op.name isa Function
         retval = c.tape[args[3]] = op.name(get(c, args[1], op.modes[1]),
                                            get(c, args[2], op.modes[2]))
@@ -98,11 +102,13 @@ function iterate(c::Computer, state)
         end
     elseif op.name === :terminate
         close(c.output)
+        close(c.input)
         return nothing
     else
         error("Invalid op: $(op)")
     end
-
+    
+    println("[$(c.id)]: $(op.name), $retval, $next_state")
     return (op.name, retval), next_state
 end
 
