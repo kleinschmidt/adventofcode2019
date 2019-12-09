@@ -10,14 +10,6 @@ export
     outputs,
     run!
 
-# helpers
-channel(c::Channel) = c
-function channel(x)
-    c = Channel{eltype(x)}(Inf)
-    foreach(xx -> put!(c, xx), x)
-    return c
-end
-
 struct Op{T,N}
     code::Int
     name::T
@@ -55,15 +47,6 @@ struct Computer{T}
 
     Computer(tape::T, input, output, id) where {T} = new{T}(tape, input, output, id, Ref(0))
 end
-
-Computer(instructions::Array; input=Int[], output=Channel{Int}(Inf), id=nothing) =
-    Computer(OffsetArray(copy(instructions), 0:length(instructions)-1),
-             channel(input),
-             output,
-             id)
-Computer(instructions::String; input=Int[], output=Channel{Int}(Inf), id=nothing) =
-    Computer(parse.(Int, split(instructions, ',')),
-             input=input, output=output, id=id)
 
 struct Arg
     addr::Int
@@ -133,6 +116,24 @@ function iterate(c::Computer, state)
     # println("[$(c.id)]: $(op.name), $retval, $next_state")
     return (op.name, retval), next_state
 end
+
+# helpers ######################################################################
+
+channel(c::Channel) = c
+function channel(x)
+    c = Channel{eltype(x)}(Inf)
+    foreach(xx -> put!(c, xx), x)
+    return c
+end
+
+Computer(instructions::Array; input=Int[], output=Channel{Int}(Inf), id=nothing) =
+    Computer(OffsetArray(copy(instructions), 0:length(instructions)-1),
+             channel(input),
+             output,
+             id)
+Computer(instructions::String; input=Int[], output=Channel{Int}(Inf), id=nothing) =
+    Computer(parse.(Int, split(instructions, ',')),
+             input=input, output=output, id=id)
 
 function run!(c::Computer)
     for _ in c
