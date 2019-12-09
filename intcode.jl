@@ -60,9 +60,9 @@ struct Computer{T}
     input::Channel{Int}
     output::Channel{Int}
     id::Union{Int,Nothing}
-    relative_base::Int
+    relative_base::Ref{Int}
 
-    Computer(tape::T, input, output, id) where {T} = new{T}(tape, input, output, id, 0)
+    Computer(tape::T, input, output, id) where {T} = new{T}(tape, input, output, id, Ref(0))
 end
 
 Computer(instructions::Array; input=Int[], output=Channel{Int}(Inf), id=nothing) =
@@ -79,15 +79,28 @@ struct Arg
     mode::Int
 end
 
-Base.show(io::IO, arg::Arg) = print(io, arg.mode == 0 ? "@" : "", arg.addr)
+Base.show(io::IO, arg::Arg) = print(io, arg.mode == 0 ? "@" : arg.mode == 2 ? "@+" : "", arg.addr)
 
+Base.getindex(c::Computer, i::Int) = i > lastindex(c.tape) ? 0 : c.tape[i]
 Base.getindex(c::Computer, arg::Arg) =
-    arg.mode == 0 ? c.tape[arg.addr] :               # position mode
-    arg.mode == 1 ? arg.addr :                       # absolute mode
+    arg.mode == 0 ? c[arg.addr] :                     # position mode
+    arg.mode == 1 ? arg.addr :                        # absolute mode
+    arg.mode == 2 ? c[arg.addr + c.relative_base[]] : # relative mode
     error("unsupported mode: $(arg.mode)")
 
+function Base.setindex!(c::Computer, x, i::Int)
+    if i > lastindex(c.tape)
+        old_last = lastindex(c.tape)
+        resize!(c.tape, length(c.tape) + i - old_last)
+        c.tape[old_last+1:end] .= 0
+        @debug "  resizing tape: $old_last → $(lastindex(c.tape))"
+    end
+    c.tape[i] = x
+end
+    
 Base.setindex!(c::Computer, x, arg::Arg) =
-    arg.mode == 0 ? (c.tape[arg.addr] = x) :
+    arg.mode == 0 ? (c[arg.addr] = x) :                   # position mode
+    arg.mode == 2 ? (c[arg.addr + c.relative_base[]] = x) : # relative mode
     error("unsupported mode: $(arg.mode)")
 
 # general strategy so far has been to treat the computer as an iterator that
@@ -127,6 +140,8 @@ function iterate(c::Computer, state)
         close(c.output)
         close(c.input)
         return nothing
+    elseif op.name === :adjustrelativebase
+        c.relative_base[] += c[args[1]]
     else
         error("Invalid op: $(op)")
     end
