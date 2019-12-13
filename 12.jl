@@ -3,15 +3,15 @@
 using Test
 using StaticArrays
 
-struct Moon{N}
+struct 🌘{N}
     pos::MVector{N,Int}
     vel::MVector{N,Int}
 end
 
-Moon(x::Vararg{Int,N}) where N = Moon(MVector{N,Int}([x...]), MVector{N,Int}(zeros(Int,N)))
+🌘(x::Vararg{Int,N}) where N = 🌘(MVector{N,Int}([x...]), MVector{N,Int}(zeros(Int,N)))
 
 gravity!((a,b)) = gravity!(a,b)
-function gravity!(a::Moon, b::Moon)
+function gravity!(a::🌘, b::🌘)
     Δv = sign.(a.pos .- b.pos)
     a.vel .-= Δv
     b.vel .+= Δv
@@ -20,27 +20,27 @@ end
 line_to_coords(input) =
     parse.(Int, match(r"<x=(-?[0-9]+), y=(-?[0-9]+), z=(-?[0-9]+)>", input).captures)
 
-function simulate!(moons)
-    for i in 1:length(moons)
-        for j in i+1:length(moons)
-            gravity!(moons[i], moons[j])
+function simulate!(🌔s)
+    for i in 1:length(🌔s)
+        for j in i+1:length(🌔s)
+            gravity!(🌔s[i], 🌔s[j])
         end
     end
-    for moon in moons
-        moon.pos .+= moon.vel
+    for 🌔 in 🌔s
+        🌔.pos .+= 🌔.vel
     end
-    return moons
+    return 🌔s
 end
 
-energy(moons::Vector{Moon{N}}) where N = sum(energy, moons)
-energy(moon::Moon) = sum(abs.(moon.pos)) * sum(abs.(moon.vel))
+energy(🌔s::Vector{🌘{N}}) where N = sum(energy, 🌔s)
+energy(🌔::🌘) = sum(abs.(🌔.pos)) * sum(abs.(🌔.vel))
 
 
 function star1(input, n)
     coords = line_to_coords.(split(chomp(input), '\n'))
-    moons = [Moon(x...) for x in coords]
-    foreach((i) -> simulate!(moons), 1:n)
-    energy(moons)
+    🌔s = [🌘(x...) for x in coords]
+    foreach((i) -> simulate!(🌔s), 1:n)
+    energy(🌔s)
 end
 
 
@@ -71,29 +71,29 @@ star1(read("12.input", String), 1000)
 # dimensions and then the LCM of those...
 #
 # and maybe there's some additional efficiency from lack of interactions between
-# moons but... probably not
+# 🌔s but... probably not
 
-Base.:(==)(a::Moon, b::Moon) = a.pos == b.pos && a.vel == b.vel
+Base.:(==)(a::🌘, b::🌘) = a.pos == b.pos && a.vel == b.vel
 
-moon_tuple(moon::Moon{N}) where {N} = (moon.pos..., moon.vel...)
+🌔_tuple(🌔::🌘{N}) where {N} = (🌔.pos..., 🌔.vel...)
 
-function moon_period(moons)
-    moon_tup = moon_tuple.(moons)
-    moonset = Set{typeof(moon_tup)}()
+function 🌔_period(🌔s)
+    🌔_tup = 🌔_tuple.(🌔s)
+    🌔set = Set{typeof(🌔_tup)}()
     period = 0
-    while moon_tup ∉ moonset
+    while 🌔_tup ∉ 🌔set
         period += 1
-        push!(moonset, moon_tup)
-        simulate!(moons)
-        moon_tup = moon_tuple.(moons)
+        push!(🌔set, 🌔_tup)
+        simulate!(🌔s)
+        🌔_tup = 🌔_tuple.(🌔s)
     end
     return period
 end    
 
 function star2(input)
     coords = line_to_coords.(split(chomp(input), '\n'))
-    moons_moons = [Moon.(x) for x in collect(zip(coords...))]
-    lcm(moon_period.(moons_moons))
+    🌔s_🌔s = [🌘.(x) for x in collect(zip(coords...))]
+    lcm(🌔_period.(🌔s_🌔s))
 end
 
 @test star2("""
